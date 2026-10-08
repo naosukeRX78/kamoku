@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="科目ナビ">
+<meta name="theme-color" content="#111216">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>勘定科目ナビ</title>
+<style>
+/* Layout: 判定＝取引を検索→科目・税区分・インボイス要否のカード／計算＝交際費・経過措置・少額資産・税込換算／早見＝税区分と特例の一覧。黒い本体に藍色のアクセント */
+:root{
+  color-scheme:dark;
+  --room:#111216; --panel:#18191e; --panel-2:#1f2026; --edge:#33353f; --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+  --glass:#07090a; --text:#e6eae8; --muted:#919a97; --dim:#646d6a;
+  --acc:#8fa2ff; --acc-hot:#d3dcff; --acc-dim:rgba(143,162,255,.14); --acc-glow:rgba(143,162,255,.42);
+  --hi:#7fd49a; --hi-bg:rgba(127,212,154,.14);
+  --jo:#f2c25c; --jo-bg:rgba(242,194,92,.14);
+  --ka:#f08a7e; --ka-bg:rgba(240,138,126,.14);
+  --f-ui:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDPGothic","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --f-min:"Hiragino Mincho ProN","Yu Mincho","BIZ UDPMincho",serif;
+  --f-num:ui-monospace,"SF Mono","Menlo","Consolas",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--room);color:var(--text)}
+body{font-family:var(--f-ui);font-size:15px;line-height:1.6;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.wrap{max-width:640px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px calc(env(safe-area-inset-bottom,0px) + 86px)}
+header.top{display:flex;align-items:baseline;justify-content:space-between;margin:2px 2px 10px}
+header.top b{font-family:var(--f-min);font-size:17px;letter-spacing:.2em}
+header.top b::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:9px;vertical-align:3px;background:var(--acc);box-shadow:0 0 8px var(--acc-glow)}
+header.top span{font-family:var(--f-num);font-size:11px;color:var(--muted);letter-spacing:.1em}
+.search{position:sticky;top:calc(env(safe-area-inset-top,0px) + 4px);z-index:5;background:var(--room);padding:2px 0 8px}
+.search input{width:100%;font:500 16px var(--f-ui);color:var(--text);background:var(--panel-2);border:1px solid var(--edge);border-radius:12px;padding:11px 14px 11px 38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23919a97' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:18px;background-position:12px 50%}
+.filters{display:flex;gap:6px;margin-top:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filters button{flex:none;font:600 13px var(--f-ui);color:var(--muted);background:var(--panel);border:1px solid var(--line-2);border-radius:999px;padding:6px 12px}
+.filters button.on{color:var(--room);background:var(--acc);border-color:var(--acc)}
+.filters button i{font-style:normal;font-family:var(--f-num);font-size:11px;opacity:.75;margin-left:4px}
+.chip{display:inline-block;font:700 11.5px var(--f-ui);border-radius:6px;padding:2px 8px;white-space:nowrap;letter-spacing:.04em}
+.chip.hi{color:var(--hi);background:var(--hi-bg)} .chip.jo{color:var(--jo);background:var(--jo-bg)} .chip.ka{color:var(--ka);background:var(--ka-bg)}
+.grp{font-size:12px;color:var(--muted);margin:14px 4px 6px;letter-spacing:.1em}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.it{border-bottom:1px solid var(--line)} .it:last-child{border-bottom:0}
+.it>button{width:100%;display:grid;grid-template-columns:1fr auto 14px;gap:10px;align-items:center;text-align:left;background:none;border:0;color:var(--text);font:500 15px var(--f-ui);padding:12px 14px}
+.it>button::after{content:"";width:8px;height:8px;border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.it.open>button::after{transform:rotate(-135deg) translate(-2px,-2px)}
+.it.open>button{color:var(--acc-hot)}
+.det{padding:0 14px 14px;display:grid;gap:10px}
+.det .rule{font-size:14.5px;line-height:1.75}
+.det ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.det li{position:relative;padding-left:20px;font-size:13.5px;line-height:1.65}
+.det li::before{content:"";position:absolute;left:4px;top:.6em;width:7px;height:7px;border-radius:2px;background:var(--acc)}
+.det .memo{font-size:12.5px;color:var(--muted);background:var(--panel-2);border-radius:10px;padding:9px 12px;line-height:1.7}
+.det .base{font-size:12px;color:var(--muted)} .det .base b{color:var(--text);font-weight:500}
+.go{justify-self:start;font:700 13px var(--f-ui);color:var(--room);background:var(--acc);border:0;border-radius:10px;padding:8px 14px}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:12px}
+.seg button{font:600 13px var(--f-ui);color:var(--muted);background:none;border:0;border-radius:9px;padding:8px 0}
+.seg button.on{background:var(--acc-dim);color:var(--acc-hot)}
+.result{border-radius:16px;padding:12px 16px;margin-bottom:12px;background:linear-gradient(180deg,#0c0f10,var(--glass));
+  box-shadow:0 0 0 1px rgba(0,0,0,.8),0 0 0 3px #131718,0 0 0 4px var(--edge),0 12px 28px rgba(0,0,0,.5)}
+.rl{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rl .lab{font-size:12px;color:var(--acc);font-weight:700;letter-spacing:.06em}
+.big{font-family:var(--f-num);font-size:clamp(1.6rem,8vw,2.2rem);font-weight:600;color:var(--acc-hot);text-shadow:0 0 14px var(--acc-glow);font-variant-numeric:tabular-nums;white-space:nowrap}
+.big small{font-size:.45em;margin-left:3px;color:var(--acc)}
+.big.bad{color:#ffc9c2;text-shadow:0 0 14px rgba(240,138,126,.45)} .big.bad small{color:var(--ka)}
+.rsub{display:flex;gap:4px 14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-family:var(--f-num);margin-top:4px}
+.rsub b{color:var(--text);font-weight:500}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:12px;overflow:hidden}
+.card>h2{font-family:var(--f-min);font-size:15px;margin:0;padding:13px 16px 2px;letter-spacing:.06em}
+.bd{padding:10px 16px 14px;display:grid;gap:11px}
+.f{display:grid;gap:5px}
+.f>label{font-size:13px;color:var(--muted)}
+.u{position:relative}.u input{padding-right:2.8em}
+.u::after{content:attr(data-u);position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+input[type=text]:not(#q),input[type=date],select{width:100%;font:500 17px var(--f-num);color:var(--text);background:var(--panel-2);border:1px solid var(--edge);border-radius:10px;padding:10px 12px;font-variant-numeric:tabular-nums}
+select{font-family:var(--f-ui);font-size:15px}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:transparent}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:360px){.row2{grid-template-columns:1fr}}
+.chk{display:flex;align-items:center;gap:10px;font-size:14px}
+.chk input{width:22px;height:22px;accent-color:var(--acc);flex:none}
+.radio{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.radio button{font:600 13.5px var(--f-ui);color:var(--muted);background:var(--panel-2);border:1px solid var(--edge);border-radius:10px;padding:9px 0}
+.radio button.on{color:var(--acc-hot);border-color:var(--acc);background:var(--acc-dim)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+.t th,.t td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.t th{color:var(--muted);font-weight:500;font-size:11.5px}
+.t th:first-child,.t td:first-child{text-align:left}
+.t td{font-family:var(--f-num)}
+.t td.j{font-family:var(--f-ui);white-space:normal}
+.t tr.hit td{color:var(--acc-hot);font-weight:700;background:var(--acc-dim)}
+.t tr.tot td{font-weight:700;color:var(--acc-hot);border-top:1px solid var(--line-2)}
+.checks{display:grid;gap:6px}
+.ck{display:flex;gap:9px;align-items:flex-start;font-size:13.5px}
+.ck i{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:800;margin-top:1px}
+.ck.y i{background:var(--hi-bg);color:var(--hi)} .ck.n i{background:var(--ka-bg);color:var(--ka)}
+.note{font-size:12px;color:var(--muted);line-height:1.7}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;background:rgba(17,18,22,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line-2);padding:6px 8px calc(env(safe-area-inset-bottom,0px) + 6px)}
+nav.tabs div{display:flex;max-width:640px;width:100%}
+nav.tabs button{flex:1;background:none;border:0;color:var(--muted);font:600 12px var(--f-ui);padding:6px 0 4px;display:grid;justify-items:center;gap:3px}
+nav.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button.on{color:var(--acc)}
+.foot{font-size:11.5px;color:var(--dim);line-height:1.7;margin:14px 4px 0}
+.z{display:inline-block;font:700 11.5px var(--f-ui);border-radius:6px;padding:2px 8px;white-space:nowrap;letter-spacing:.03em}
+.z.k10{color:#9fb2ff;background:rgba(143,162,255,.15)} .z.k8{color:#7fd4c4;background:rgba(127,212,196,.14)}
+.z.hi{color:#d7a6f2;background:rgba(215,166,242,.14)} .z.fu{color:#b4b8c2;background:rgba(180,184,194,.13)}
+.z.men{color:#8fd99a;background:rgba(143,217,154,.14)} .z.mx{color:#f2c25c;background:rgba(242,194,92,.14)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px;align-items:baseline}
+.kv dt{color:var(--muted);font-size:12px} .kv dd{margin:0}
+.kv dd.acct{font-size:16px;font-weight:700;color:var(--acc-hot)}
+.inv{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 8px}
+.inv.req{color:#ffd9a0;background:rgba(242,170,80,.14)} .inv.no{color:#8fd99a;background:rgba(143,217,154,.14)} .inv.na{color:var(--muted);background:var(--panel-2)}
+.side{font-size:11px;color:var(--dim);margin-left:6px}
+.zl{display:grid;gap:10px}
+.zl div{display:grid;grid-template-columns:6.4em 1fr;gap:10px;font-size:13px;line-height:1.65;align-items:start}
+.seg{grid-template-columns:repeat(4,1fr)}
+.opt{display:grid;gap:8px}
+.op{border:1px solid var(--line-2);border-radius:12px;padding:10px 12px}
+.op b{display:block;font-size:14.5px} .op span{font-size:12.5px;color:var(--muted);line-height:1.65}
+.op.best{border-color:var(--acc);background:var(--acc-dim)} .op.best b{color:var(--acc-hot)}
+.op.best b::before{content:"おすすめ";font-size:10.5px;color:var(--room);background:var(--acc);border-radius:4px;padding:1px 6px;margin-right:8px;vertical-align:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><b>勘定科目ナビ</b><span>科目・消費税区分 R8.10</span></header>
+
+<section id="v-judge">
+  <div class="search">
+    <input type="text" id="q" placeholder="取引で探す（例：タクシー、車検、商品券）" autocomplete="off" enterkeyhint="search">
+    <div class="filters" id="flt">
+      <button type="button" data-v="" class="on">すべて<i></i></button>
+      <button type="button" data-v="k10">課税10%<i></i></button>
+      <button type="button" data-v="k8">8%<i></i></button>
+      <button type="button" data-v="hi">非課税<i></i></button>
+      <button type="button" data-v="fu">不課税<i></i></button>
+      <button type="button" data-v="etc">免税・混在<i></i></button>
+    </div>
+  </div>
+  <div id="list"></div>
+  <p class="foot">勘定科目は一般的な例です。事務所や顧問先で使っている科目体系がある場合はそちらに合わせてください。仕入税額控除には、帳簿と適格請求書（インボイス）の両方の保存が原則として必要です。</p>
+</section>
+
+<section id="v-calc" hidden>
+  <div class="seg" id="seg">
+    <button type="button" data-c="settai" class="on">交際費</button>
+    <button type="button" data-c="menzei">免税事業者</button>
+    <button type="button" data-c="shisan">少額資産</button>
+    <button type="button" data-c="split">税込換算</button>
+  </div>
+
+  <div data-pane="settai">
+    <div class="result">
+      <div class="rl"><span class="lab">判定</span><span class="big" id="eBig">会議費</span></div>
+      <div class="rsub"><span>1人当たり <b id="ePer">0</b></span><span>判定に使う額 <b id="eBase">0</b></span></div>
+    </div>
+    <div class="card"><h2>飲食費（令和6年4月1日以後の支出）</h2><div class="bd">
+      <div class="f"><label for="eTot">支払総額（税込）</label><div class="u" data-u="円"><input type="text" id="eTot" inputmode="numeric"></div></div>
+      <div class="f"><label for="eN">参加人数（自社の人も含む）</label><div class="u" data-u="人"><input type="text" id="eN" inputmode="numeric"></div></div>
+      <div class="radio" id="eKeiri" style="grid-template-columns:1fr 1fr"><button type="button" data-k="nuki" class="on">税抜経理</button><button type="button" data-k="komi">税込経理</button></div>
+      <label class="chk"><input type="checkbox" id="eOut">社外の人（取引先など）が参加している</label>
+      <div class="note" id="eNote"></div>
+    </div></div>
+  </div>
+
+  <div data-pane="menzei" hidden>
+    <div class="result">
+      <div class="rl"><span class="lab">控除できる消費税額</span><span class="big" id="mDed">0<small>円</small></span></div>
+      <div class="rsub"><span>控除割合 <b id="mRate">0</b></span><span>本来の税額 <b id="mFull">0</b></span><span>控除できない額 <b id="mCost">0</b></span></div>
+    </div>
+    <div class="card"><h2>免税事業者等からの課税仕入</h2><div class="bd">
+      <div class="f"><label for="mAmt">支払額（税込）</label><div class="u" data-u="円"><input type="text" id="mAmt" inputmode="numeric"></div></div>
+      <div class="row2">
+        <div class="f"><label for="mDate">課税仕入の日</label><input type="date" id="mDate"></div>
+        <div class="f"><label for="mRt">税率</label><select id="mRt"><option value="10">10%</option><option value="8">8%（軽減）</option></select></div>
+      </div>
+      <div class="tw"><table class="t" id="mTbl"></table></div>
+      <div class="note">控除できない額は、税抜経理なら仕入・経費の額に含めます（取得価額・費用）。区分記載請求書等の保存と、帳簿に経過措置の適用を受ける旨（「80%控除対象」「70%控除対象」など）の記載が要件です。令和8年10月1日以後に開始する課税期間からは、同じ免税事業者からの年間の課税仕入が税込1億円を超える部分には適用されません。</div>
+    </div></div>
+  </div>
+
+  <div data-pane="shisan" hidden>
+    <div class="result">
+      <div class="rl"><span class="lab">取得価額（1単位）</span><span class="big" id="aBig">0<small>円</small></span></div>
+      <div class="rsub"><span>中小特例の上限 <b id="aLim">40万円未満</b></span></div>
+    </div>
+    <div class="card"><h2>少額の減価償却資産</h2><div class="bd">
+      <div class="f"><label for="aPrice">取得価額（税抜経理なら税抜、税込経理なら税込）</label><div class="u" data-u="円"><input type="text" id="aPrice" inputmode="numeric"></div></div>
+      <div class="f"><label for="aDate">取得し事業に使い始めた日</label><input type="date" id="aDate"></div>
+      <label class="chk"><input type="checkbox" id="aChusho">中小企業者等（青色申告の資本金1億円以下の法人・個人事業者）</label>
+      <div class="opt" id="aOpt"></div>
+      <div class="note">取得価額は1単位（通常1組・1式で機能するもの）ごとに判定します。応接セットやカーテンなどはセット単位。中小特例は令和8年4月1日以後の取得から40万円未満（それまでは30万円未満）で、令和11年3月31日まで。常時使用する従業員が400人超の法人は対象外。主要な事業でない貸付用の資産は、いずれの特例も使えません。</div>
+    </div></div>
+  </div>
+
+  <div data-pane="split" hidden>
+    <div class="result">
+      <div class="rl"><span class="lab" id="xLab">税抜金額</span><span class="big" id="xBig">0<small>円</small></span></div>
+      <div class="rsub"><span>消費税 <b id="xTax">0</b></span><span id="xOther"></span></div>
+    </div>
+    <div class="card"><h2>税込・税抜の換算</h2><div class="bd">
+      <div class="radio" id="xDir" style="grid-template-columns:1fr 1fr"><button type="button" data-d="komi" class="on">税込から税抜</button><button type="button" data-d="nuki">税抜から税込</button></div>
+      <div class="row2">
+        <div class="f"><label for="xAmt">金額</label><div class="u" data-u="円"><input type="text" id="xAmt" inputmode="numeric"></div></div>
+        <div class="f"><label for="xRt">税率</label><select id="xRt"><option value="10">10%</option><option value="8">8%（軽減）</option></select></div>
+      </div>
+      <div class="f"><label for="xAmt8">同じレシートの8%対象（税込・任意）</label><div class="u" data-u="円"><input type="text" id="xAmt8" inputmode="numeric"></div></div>
+      <div class="tw"><table class="t" id="xTbl"></table></div>
+      <div class="note">1円未満は切り捨て。適格請求書の消費税額は、1枚の請求書ごとに税率ごとに1回だけ端数処理します（品目ごとの端数処理は不可）。</div>
+    </div></div>
+  </div>
+</section>
+
+<section id="v-quick" hidden>
+  <div class="card"><h2>税区分の違い</h2><div class="bd"><div class="zl" id="zl"></div></div></div>
+  <div class="card"><h2>帳簿のみの保存で控除できる取引</h2><div class="bd"><div class="tw"><table class="t" id="tkTbl"></table></div></div></div>
+  <div class="card"><h2>免税事業者からの仕入（経過措置）</h2><div class="bd"><div class="tw"><table class="t" id="kkTbl"></table></div></div></div>
+  <div class="card"><h2>少額資産の区分</h2><div class="bd"><div class="tw"><table class="t">
+    <tr><th>取得価額</th><th>処理</th></tr>
+    <tr><td class="j">10万円未満</td><td class="j" style="text-align:right">全額損金（消耗品費）</td></tr>
+    <tr><td class="j">20万円未満</td><td class="j" style="text-align:right">一括償却資産（3年均等）も可</td></tr>
+    <tr><td class="j">40万円未満</td><td class="j" style="text-align:right">中小特例で全額損金（年300万円まで）</td></tr>
+    <tr><td class="j">40万円以上</td><td class="j" style="text-align:right">通常の減価償却</td></tr>
+  </table></div><div class="note">40万円は令和8年4月1日以後の取得から（それまでは30万円）。</div></div></div>
+  <p class="foot">令和8年10月1日現在の法令・通達・国税庁Q&Aをもとに作成。入力した内容はこの端末の中だけで計算・保存されます。</p>
+</section>
+</div>
+
+<nav class="tabs"><div>
+  <button type="button" data-tab="judge" class="on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M8.5 11l1.8 1.8 3.4-3.6"/></svg>判定</button>
+  <button type="button" data-tab="calc"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8 7h8M8 11h2M12 11h2M16 11v6M8 14h2M12 14h2M8 17h6"/></svg>計算</button>
+  <button type="button" data-tab="quick"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M10 4.5v15"/></svg>早見</button>
+</div></nav>
+
+<script>
+/* 勘定科目・消費税区分ナビ データ（令和8年10月現在）
+   z: k10=課税10% / k8=課税8%（軽減） / hi=非課税 / fu=不課税（対象外） / men=免税（輸出） / mx=内訳で異なる
+   s: 'u'=売上側 / 'k'=仕入・経費側
+   inv: 'req'=適格請求書が必要 / 'no'=帳簿のみで控除可（請求書不要の特例） / ''=仕入税額控除の対象外  */
+var TX = [
+/* ---------- 売上・収入 ---------- */
+{id:'uriage',g:'売上・収入',t:'商品・サービスの売上',a:'売上高',z:'k10',s:'u',k:'売上 販売 役務 請負',
+ n:['飲食料品（酒類・外食を除く）の販売は8%','登録事業者は、求められたら適格請求書を交付する義務あり']},
+{id:'uriage8',g:'売上・収入',t:'飲食料品の売上（テイクアウト・宅配）',a:'売上高',z:'k8',s:'u',k:'食品 テイクアウト 持ち帰り 軽減',
+ n:['酒類、外食（店内飲食・ケータリング）は10%','一体資産（おもちゃ付き菓子など）は税抜1万円以下かつ食品部分が3分の2以上なら8%']},
+{id:'yushutsu',g:'売上・収入',t:'輸出売上',a:'売上高',z:'men',s:'u',k:'輸出 海外 外国',
+ n:['輸出許可書や税関の証明など、輸出の証明書類の保存が免税の要件','国外の事業者への役務提供（国内で受けるものを除く）も免税になる場合あり']},
+{id:'tochi_u',g:'売上・収入',t:'土地の売却',a:'土地（簿価との差額は固定資産売却益・損）',z:'hi',s:'u',k:'土地 売却 譲渡 不動産',
+ n:['売却額の全額が非課税売上となり、課税売上割合が下がる','課税売上割合が大きく下がる場合は「課税売上割合に準ずる割合」の承認申請を検討','建物と一括で売ると、建物部分は課税（按分が必要）']},
+{id:'tatemono_u',g:'売上・収入',t:'建物の売却',a:'建物（簿価との差額は固定資産売却益・損）',z:'k10',s:'u',k:'建物 売却 譲渡 不動産',
+ n:['利益ではなく売却額の全額が課税売上','固定資産税の精算金も売却代金の一部として課税']},
+{id:'sharyo_u',g:'売上・収入',t:'車両の売却・下取り',a:'車両運搬具（簿価との差額は固定資産売却益・損）',z:'k10',s:'u',k:'車 自動車 下取り 売却',
+ n:['下取り価格の全額が課税売上（新車購入代金と相殺していても両建てで処理）','未経過の自動車税相当額を受け取ったら、売却代金の一部として課税']},
+{id:'yachin_j',g:'売上・収入',t:'住宅の家賃の受取',a:'受取家賃（不動産賃貸収入）',z:'hi',s:'u',k:'家賃 賃貸 住宅 アパート マンション',
+ n:['契約で居住用と明らかなもの、又は状況から居住用と明らかなもの','貸付期間が1か月未満の場合や旅館業に当たる場合は課税','共益費も家賃と同じ扱い']},
+{id:'yachin_t',g:'売上・収入',t:'事務所・店舗の家賃の受取',a:'受取家賃（不動産賃貸収入）',z:'k10',s:'u',k:'家賃 賃貸 事務所 店舗 テナント',
+ n:['礼金・更新料も課税','返還する敷金・保証金は不課税、返還しない部分は課税']},
+{id:'chusha_u',g:'売上・収入',t:'駐車場の賃料の受取',a:'受取家賃（不動産賃貸収入）',z:'k10',s:'u',k:'駐車場 月極 賃貸',
+ n:['区画を設ける・フェンスや舗装がある等、施設としての貸付は課税','更地をそのまま貸す（施設の利用を伴わない）場合は土地の貸付として非課税','住宅に付随し、1戸につき1台以上の割当てがあり家賃と区別していない駐車場は非課税']},
+{id:'uketori_risoku',g:'売上・収入',t:'受取利息',a:'受取利息',z:'hi',s:'u',k:'利息 預金 貸付金',
+ n:['非課税売上として課税売上割合の分母に入る','源泉徴収された所得税（法人は15.315%）は法人税額から控除']},
+{id:'haito',g:'売上・収入',t:'受取配当金',a:'受取配当金',z:'fu',s:'u',k:'配当 株式 出資',n:['課税売上割合の計算にも入れない']},
+{id:'hojokin',g:'売上・収入',t:'補助金・助成金・保険金の受取',a:'雑収入（補助金収入）',z:'fu',s:'u',k:'補助金 助成金 給付金 保険金 雇用調整',
+ n:['対価性がないので不課税','補助金で取得した資産の課税仕入は、通常どおり控除できる（国・地方公共団体等の特定収入の調整は別）']},
+{id:'songai_u',g:'売上・収入',t:'損害賠償金の受取',a:'雑収入',z:'fu',s:'u',k:'損害賠償 賠償金 違約金 キャンセル料',
+ n:['実質的に資産の譲渡等の対価に当たるもの（損傷した商品を相手に引き渡して受ける賠償金等）は課税','解約に伴うキャンセル料のうち、事務手数料に当たる部分は課税']},
+{id:'yuka_u',g:'売上・収入',t:'有価証券（株式）の売却',a:'有価証券（差額は有価証券売却益・損）',z:'hi',s:'u',k:'株式 株 有価証券 投資信託 売却',
+ n:['課税売上割合の計算では、売却額の5%だけを分母に入れる']},
+{id:'nebiki_u',g:'売上・収入',t:'売上値引・返品・リベート',a:'売上値引・返品（売上高のマイナス）',z:'k10',s:'u',k:'値引 返品 リベート 割戻し 振込手数料 差引',
+ n:['売上に係る対価の返還等として、売上の税率で税額を控除','返還インボイスの交付が必要。税込1万円未満なら不要','得意先が振込手数料を差し引いて入金した分を売上値引とすれば、1万円未満の返還インボイスは不要']},
+/* ---------- 仕入・外注 ---------- */
+{id:'shiire',g:'仕入・外注',t:'商品の仕入',a:'仕入高',z:'k10',s:'k',inv:'req',k:'仕入 商品 材料',
+ n:['飲食料品の仕入は8%','免税事業者からの仕入は経過措置（令和8年10月以後70%）']},
+{id:'gaichu',g:'仕入・外注',t:'外注費（業務委託）',a:'外注費',z:'k10',s:'k',inv:'req',k:'外注 業務委託 請負 下請 フリーランス',
+ n:['個人へのデザイン料・原稿料・講演料などは源泉徴収（10.21%、100万円超の部分は20.42%）','雇用契約に近い実態（指揮命令・時間拘束・材料支給）だと給与と判断され、仕入税額控除できない']},
+{id:'menzei_shiire',g:'仕入・外注',t:'免税事業者（インボイスなし）からの仕入',a:'仕入高・各経費科目',z:'k10',s:'k',inv:'req',k:'免税事業者 未登録 経過措置 80% 70% 区分記載',
+ n:['令和5年10月〜令和8年9月は80%、令和8年10月〜令和10年9月は70%、令和10年10月〜令和12年9月は50%、令和12年10月〜令和13年9月は30%を控除','区分記載請求書等の保存と、帳簿に「80%控除対象」「70%控除対象」等の記載が必要','令和8年10月1日以後に開始する課税期間から、同じ免税事業者からの年間の課税仕入が1億円を超える部分は対象外（改正前10億円）','「計算」タブで控除額を計算できます']},
+/* ---------- 人件費 ---------- */
+{id:'kyuyo',g:'人件費・福利厚生',t:'給与・賞与・役員報酬',a:'給料手当・賞与・役員報酬',z:'fu',s:'k',k:'給与 給料 賞与 役員報酬 アルバイト パート',n:['仕入税額控除の対象外','退職金も不課税']},
+{id:'tsukin',g:'人件費・福利厚生',t:'通勤手当',a:'旅費交通費（通勤費）',z:'k10',s:'k',inv:'no',k:'通勤手当 通勤費 定期',
+ n:['通勤に通常必要と認められる部分は課税仕入（所得税の非課税限度額を超える部分も含む）','帳簿のみの保存で控除できる（「従業員に支給する通勤手当」と記載）']},
+{id:'nitto',g:'人件費・福利厚生',t:'出張旅費・日当（従業員への支給）',a:'旅費交通費',z:'k10',s:'k',inv:'no',k:'出張 日当 宿泊 旅費規程',
+ n:['国内出張で、通常必要と認められる部分は課税仕入','帳簿のみの保存で控除できる（「出張旅費等特例」と記載）','海外出張の旅費・日当は対象外（輸出免税・国外取引）']},
+{id:'hotei',g:'人件費・福利厚生',t:'社会保険料・労働保険料（会社負担）',a:'法定福利費',z:'hi',s:'k',k:'社会保険 健康保険 厚生年金 雇用保険 労災 労働保険 法定福利',
+ n:['子ども・子育て支援金も同じ扱い']},
+{id:'kenshin',g:'人件費・福利厚生',t:'健康診断・人間ドック',a:'福利厚生費',z:'k10',s:'k',inv:'req',k:'健康診断 健診 人間ドック ストレスチェック 予防接種',
+ n:['健康診断は保険診療ではないので課税','従業員全員を対象としない役員だけの人間ドックは役員給与になりうる']},
+{id:'keicho_n',g:'人件費・福利厚生',t:'従業員への慶弔見舞金',a:'福利厚生費',z:'fu',s:'k',k:'慶弔 見舞金 祝金 香典 結婚祝 出産祝',n:['規程に基づく社会通念上相当な額なら給与課税されない']},
+{id:'shanai_inshoku',g:'人件費・福利厚生',t:'忘年会・新年会（社内・全員対象）',a:'福利厚生費',z:'k10',s:'k',inv:'req',k:'忘年会 新年会 歓迎会 送別会 社内 飲み会',
+ n:['全従業員を対象とする通常の行事なら福利厚生費','一部の人だけの社内飲食は交際費（1人1万円以下の基準は社内飲食に使えない）']},
+{id:'ryoko',g:'人件費・福利厚生',t:'社員旅行',a:'福利厚生費',z:'k10',s:'k',inv:'req',k:'社員旅行 慰安旅行',
+ n:['4泊5日以内・全従業員の50%以上参加などの要件を満たすと福利厚生費','海外部分の旅費は対象外']},
+{id:'shataku',g:'人件費・福利厚生',t:'社宅の家賃（借上社宅）',a:'地代家賃（又は福利厚生費）',z:'hi',s:'k',k:'社宅 借上社宅 寮 住宅',
+ n:['住宅の貸付なので非課税','従業員から受け取る家賃も非課税（受取側）']},
+{id:'shikaku',g:'人件費・福利厚生',t:'研修費・資格取得費用',a:'研修費（教育研修費）',z:'k10',s:'k',inv:'req',k:'研修 セミナー 講習 資格 受験料',
+ n:['国家試験の受験手数料は行政手数料として非課税','民間の講座・セミナー受講料は課税']},
+/* ---------- 交際費・会議費 ---------- */
+{id:'settai_over',g:'交際費・会議費',t:'取引先との飲食（1人1万円超）',a:'交際費',z:'k10',s:'k',inv:'req',k:'接待 飲食 会食 取引先 交際費',
+ n:['資本金1億円以下の法人は、年800万円までの損金算入か、接待飲食費の50%損金算入かの有利な方を選択','1人当たりの判定は会社の経理方式（税抜経理なら税抜）で行う','「計算」タブで判定できます']},
+{id:'settai_under',g:'交際費・会議費',t:'取引先との飲食（1人1万円以下）',a:'会議費（交際費等から除外）',z:'k10',s:'k',inv:'req',k:'接待 飲食 会食 取引先 1万円 会議費',
+ n:['令和6年4月1日以後の支出から、1人当たり1万円以下（改正前5,000円）の飲食費は交際費等から除かれる','飲食の年月日、参加者の氏名・関係、人数、金額、店名・所在地を記載した書類の保存が要件','社内の人だけの飲食は対象外']},
+{id:'kaigi',g:'交際費・会議費',t:'会議の弁当・お茶・茶菓',a:'会議費',z:'k8',s:'k',inv:'req',k:'会議 弁当 お茶 茶菓 打合せ ミーティング',
+ n:['持ち帰り・配達の弁当は8%','会議室での飲食サービス（ケータリング）や喫茶店での打合せは10%']},
+{id:'zoto_food',g:'交際費・会議費',t:'お中元・お歳暮（食品）',a:'交際費',z:'k8',s:'k',inv:'req',k:'中元 歳暮 贈答 手土産 菓子',
+ n:['酒類や食品以外の贈答品は10%','送料は10%']},
+{id:'shohinken',g:'交際費・会議費',t:'商品券・ギフトカードを贈る',a:'交際費',z:'hi',s:'k',k:'商品券 ギフトカード ビール券 クオカード 贈答',
+ n:['物品切手等の購入は非課税（仕入税額控除なし）','贈った相手が使ったときに課税']},
+{id:'keicho_t',g:'交際費・会議費',t:'取引先への祝金・香典・花輪',a:'交際費',z:'fu',s:'k',k:'祝金 香典 弔慰 お祝い 取引先 花輪 供花',
+ n:['現金の祝金・香典は不課税（領収書がないので出金伝票で記録）','花輪・供花の購入代金は10%']},
+{id:'golf',g:'交際費・会議費',t:'取引先とのゴルフ',a:'交際費',z:'mx',s:'k',inv:'req',k:'ゴルフ プレー代 ゴルフ場利用税',
+ n:['プレー代は10%','ゴルフ場利用税は不課税（請求書で区分されていること）']},
+/* ---------- 旅費交通費 ---------- */
+{id:'densha',g:'旅費・交通',t:'電車・バス代（3万円未満）',a:'旅費交通費',z:'k10',s:'k',inv:'no',k:'電車 バス 鉄道 運賃 切符 交通系IC',
+ n:['税込3万円未満の公共交通機関（鉄道・バス・船舶）の運賃は帳簿のみで控除できる','航空機とタクシーはこの特例の対象外','ICカードのチャージは不課税、利用時に課税仕入']},
+{id:'taxi',g:'旅費・交通',t:'タクシー代',a:'旅費交通費',z:'k10',s:'k',inv:'req',k:'タクシー ハイヤー',
+ n:['公共交通機関の特例の対象外なので、適格簡易請求書（レシート）が必要','基準期間の課税売上高1億円以下等なら、税込1万円未満は帳簿のみで可（少額特例、令和11年9月まで）']},
+{id:'hikoki',g:'旅費・交通',t:'航空券（国内線）',a:'旅費交通費',z:'k10',s:'k',inv:'req',k:'飛行機 航空券 国内線',
+ n:['公共交通機関の特例の対象外','国際線の航空券は免税（仕入税額控除なし）。空港使用料等も同様']},
+{id:'kosoku',g:'旅費・交通',t:'高速道路料金',a:'旅費交通費（又は車両費）',z:'k10',s:'k',inv:'req',k:'高速 ETC 有料道路',
+ n:['ETCは利用明細（適格簡易請求書）をWebでダウンロードして保存','ETCカードの利用明細ではなく、道路会社の利用証明書・明細が必要']},
+{id:'gasoline',g:'旅費・交通',t:'ガソリン代',a:'車両費（燃料費）',z:'k10',s:'k',inv:'req',k:'ガソリン 給油 燃料',
+ n:['ガソリン税は本体価格に含まれ、全体が課税']},
+{id:'keiyu',g:'旅費・交通',t:'軽油代',a:'車両費（燃料費）',z:'mx',s:'k',inv:'req',k:'軽油 軽油引取税 ディーゼル',
+ n:['軽油引取税は不課税、本体部分は10%','レシートで軽油引取税が区分されていることを確認']},
+{id:'chusha_k',g:'旅費・交通',t:'駐車場代（コインパーキング・月極）',a:'旅費交通費・地代家賃',z:'k10',s:'k',inv:'req',k:'駐車場 コインパーキング 月極 パーキング',
+ n:['コインパーキングは自動販売機特例の対象外（国税庁Q&A）。精算機の領収書（登録番号付き）を保存','少額特例の対象事業者なら税込1万円未満は帳簿のみで可']},
+/* ---------- 一般経費 ---------- */
+{id:'tsushin',g:'一般経費',t:'電話・インターネット料金',a:'通信費',z:'k10',s:'k',inv:'req',k:'電話 携帯 スマホ インターネット 回線 プロバイダ',
+ n:['国外事業者のクラウドサービス等は「海外のWebサービス」を参照']},
+{id:'kitte',g:'一般経費',t:'切手・はがきの購入',a:'通信費（未使用分は貯蔵品）',z:'k10',s:'k',inv:'no',k:'切手 はがき レターパック 郵便',
+ n:['郵便局等での切手の購入自体は非課税。自ら使う切手は、継続適用を条件に購入時に課税仕入とできる','ポスト投函の郵便料金は帳簿のみで控除可','レターパックも切手と同じ扱い']},
+{id:'yubin',g:'一般経費',t:'郵便料金・宅配便（窓口で支払）',a:'通信費・荷造運賃',z:'k10',s:'k',inv:'req',k:'郵便 宅配便 送料 ゆうパック 書留',n:['窓口で受け取るレシートが適格簡易請求書になる']},
+{id:'inshi',g:'一般経費',t:'収入印紙',a:'租税公課',z:'hi',s:'k',k:'収入印紙 印紙 印紙税',n:['郵便局・コンビニ等での購入は非課税']},
+{id:'koteishisan',g:'一般経費',t:'固定資産税・自動車税・事業税等',a:'租税公課',z:'fu',s:'k',k:'固定資産税 自動車税 事業税 住民税 均等割 登録免許税 重量税 不動産取得税',
+ n:['法人税・住民税・延滞税・加算税・罰金は損金不算入','事業税は損金算入（申告書を提出した事業年度）']},
+{id:'gyosei',g:'一般経費',t:'住民票・登記簿謄本・印鑑証明の手数料',a:'支払手数料（又は租税公課）',z:'hi',s:'k',k:'住民票 謄本 登記事項証明 印鑑証明 行政手数料 パスポート',n:['法令に基づく行政手数料は非課税']},
+{id:'kounetsu',g:'一般経費',t:'電気・ガス・水道料金',a:'水道光熱費',z:'k10',s:'k',inv:'req',k:'電気 ガス 水道 光熱',n:['自宅兼事務所は事業割合で按分（個人事業）']},
+{id:'yachin_k',g:'一般経費',t:'事務所・店舗の家賃',a:'地代家賃',z:'k10',s:'k',inv:'req',k:'家賃 事務所 店舗 テナント 共益費',
+ n:['口座振替・振込で請求書がない場合は、契約書（登録番号等の記載）と通帳の記録の組み合わせで要件を満たす','貸主が免税事業者なら経過措置の対象']},
+{id:'reikin',g:'一般経費',t:'礼金・更新料（事務所）',a:'長期前払費用（20万円未満は支払時の費用）',z:'k10',s:'k',inv:'req',k:'礼金 更新料 権利金',
+ n:['税務上の繰延資産。償却期間は原則5年（賃借期間が5年未満でその期間の更新時に更新料が必要なら賃借期間）','消費税は支払時に全額控除']},
+{id:'shikikin',g:'一般経費',t:'敷金・保証金の差入れ',a:'差入保証金（敷金）',z:'fu',s:'k',k:'敷金 保証金 差入保証金',n:['返還されない部分（償却部分）は、返還しないことが確定した時に課税仕入']},
+{id:'hoken',g:'一般経費',t:'損害保険料・生命保険料',a:'保険料',z:'hi',s:'k',k:'保険 火災保険 自動車保険 自賠責 生命保険 損害保険',n:['保険料は非課税','保険代理店手数料（代理店側の売上）は課税']},
+{id:'furikomi',g:'一般経費',t:'振込手数料',a:'支払手数料',z:'k10',s:'k',inv:'req',k:'振込手数料 銀行 手数料 ATM',
+ n:['ATMでの振込は自動販売機特例により帳簿のみで可（3万円未満）','ネットバンキングは銀行が発行する適格請求書（Webの明細）を保存']},
+{id:'card_tesuryo',g:'一般経費',t:'クレジットカード加盟店手数料・決済手数料',a:'支払手数料',z:'hi',s:'k',k:'クレジット カード 加盟店 決済 手数料 Square Airペイ',n:['金銭債権の譲受け等の対価として非課税']},
+{id:'zeirishi',g:'一般経費',t:'税理士・社労士・弁護士報酬',a:'支払報酬',z:'k10',s:'k',inv:'req',k:'税理士 社労士 弁護士 司法書士 報酬 顧問料',
+ n:['個人への報酬は源泉徴収（10.21%、100万円超の部分は20.42%）。司法書士は1万円を引いた額に10.21%','司法書士への支払に含まれる登録免許税・印紙代（立替分）は不課税']},
+{id:'shasha',g:'一般経費',t:'車検費用',a:'車両費（修繕費）・租税公課・保険料',z:'mx',s:'k',inv:'req',k:'車検 整備 重量税 自賠責 リサイクル',
+ n:['整備・点検代は10%','自動車重量税・印紙代は不課税（租税公課）','自賠責保険料は非課税（保険料）']},
+{id:'shinbun',g:'一般経費',t:'新聞代（定期購読）',a:'新聞図書費',z:'k8',s:'k',inv:'req',k:'新聞 購読',
+ n:['週2回以上発行で定期購読契約によるものは8%','駅・コンビニでの1部買いと電子版は10%']},
+{id:'shoseki',g:'一般経費',t:'書籍・雑誌',a:'新聞図書費',z:'k10',s:'k',inv:'req',k:'書籍 本 雑誌 書店 図書'},
+{id:'kokoku',g:'一般経費',t:'広告宣伝費（チラシ・Web広告）',a:'広告宣伝費',z:'k10',s:'k',inv:'req',k:'広告 宣伝 チラシ 看板 ホームページ'},
+{id:'kaigai_web',g:'一般経費',t:'海外のWebサービス・Web広告',a:'通信費・広告宣伝費・支払手数料',z:'k10',s:'k',inv:'req',k:'海外 国外事業者 クラウド サブスク Google Meta Amazon リバースチャージ',
+ n:['事業者向け（Web広告など）は「リバースチャージ方式」：課税売上割合95%以上又は簡易課税なら当面なかったものとして扱い、仕入税額控除もしない','消費者向け（アプリ・クラウドストレージ等）は、登録国外事業者のインボイスがあれば控除可','日本法人経由で契約していれば通常の国内取引']},
+{id:'kaihi',g:'一般経費',t:'同業者団体・商工会議所の会費',a:'諸会費',z:'fu',s:'k',k:'会費 年会費 商工会議所 法人会 組合 協会',
+ n:['通常会費は対価性がなく不課税','セミナー参加費・名簿代など対価性があるものは課税。団体の通知による区分に従う','ゴルフクラブ・ホテル会員の年会費は課税']},
+{id:'kifu',g:'一般経費',t:'寄附金',a:'寄附金',z:'fu',s:'k',k:'寄附 寄付 ふるさと納税 協賛',n:['法人の寄附金は損金算入限度額あり（国・地方公共団体、指定寄附金は全額）']},
+{id:'jihanki',g:'一般経費',t:'自動販売機での購入（3万円未満）',a:'会議費・福利厚生費等',z:'k8',s:'k',inv:'no',k:'自動販売機 自販機 飲料 ジュース',n:['飲料は8%（酒類は10%）','帳簿のみで控除できる（「自販機特例」等と記載）']},
+{id:'tatekae',g:'一般経費',t:'立替金・仮払金',a:'立替金・仮払金',z:'fu',s:'k',k:'立替 立替金 仮払 精算',n:['立替払いを受けた側は、立替金精算書と相手のインボイスの写しで控除可']},
+{id:'songai_k',g:'一般経費',t:'損害賠償金の支払',a:'雑損失',z:'fu',s:'k',k:'損害賠償 賠償金 違約金 和解金'},
+/* ---------- 資産の取得 ---------- */
+{id:'shomohin',g:'資産の取得',t:'パソコン・備品（10万円未満）',a:'消耗品費',z:'k10',s:'k',inv:'req',k:'パソコン PC 備品 机 椅子 プリンター 消耗品',
+ n:['1単位（通常1組・1式）の取得価額で判定','10万円以上は「計算」タブの少額資産の判定を参照']},
+{id:'sharyo_k',g:'資産の取得',t:'車両の購入',a:'車両運搬具',z:'mx',s:'k',inv:'req',k:'車 自動車 購入 新車 中古車',
+ n:['車両本体・付属品・登録手数料は10%（取得時に全額控除）','自動車税環境性能割・重量税は不課税、自賠責保険は非課税','リサイクル預託金は不課税（預け金）','中古車販売業者からの購入は通常どおりインボイス。個人からの購入は古物商の特例']},
+{id:'tochi_k',g:'資産の取得',t:'土地の購入',a:'土地',z:'hi',s:'k',k:'土地 購入 取得 不動産',
+ n:['土地代は非課税','仲介手数料は土地の取得価額に含めるが、消費税は課税仕入','固定資産税の精算金は土地の取得価額']},
+{id:'tatemono_k',g:'資産の取得',t:'建物の購入・建築',a:'建物（建物附属設備）',z:'k10',s:'k',inv:'req',k:'建物 購入 建築 新築 取得',
+ n:['取得時に全額控除','居住用賃貸建物（住宅として貸す建物で税抜1,000万円以上）は仕入税額控除できない','高額特定資産（税抜1,000万円以上）を取得すると、一定期間は免税事業者・簡易課税に戻れない']},
+{id:'software',g:'資産の取得',t:'ソフトウェアの購入・サブスク',a:'ソフトウェア（10万円未満・月額利用は支払手数料等）',z:'k10',s:'k',inv:'req',k:'ソフトウェア 会計ソフト サブスク ライセンス',n:['国外事業者から購入する場合は「海外のWebサービス」を参照']},
+{id:'kariire',g:'資産の取得',t:'借入金の返済・利息の支払',a:'借入金（元本）・支払利息',z:'hi',s:'k',k:'借入 返済 元本 利息 ローン 信用保証料',
+ n:['元本の返済は不課税、利息は非課税','信用保証協会の保証料も非課税','割賦購入の利息は、契約で明示されていれば非課税']},
+{id:'yuka_k',g:'資産の取得',t:'有価証券・ゴルフ会員権の購入',a:'有価証券・ゴルフ会員権',z:'mx',s:'k',k:'株式 有価証券 ゴルフ会員権 出資',
+ n:['株式・出資金の購入は非課税（仕入税額控除なし）','ゴルフ会員権は株式形態・預託金形態とも課税（10%）。ただしクラブに新規入会して払う預託金（返還されるもの）は不課税','証券会社の売買手数料は課税']},
+{id:'denshimoney',g:'資産の取得',t:'電子マネー・交通系ICのチャージ',a:'仮払金（前払金）',z:'fu',s:'k',k:'電子マネー チャージ Suica ICOCA PayPay',n:['チャージ時は不課税。利用した時にその内容で課税仕入（利用明細を保存）']}
+];
+
+// 税区分の説明
+var ZK = {
+ k10:{l:'課税10%',d:'標準税率。国内で事業として対価を得て行う資産の譲渡・貸付・役務の提供。'},
+ k8:{l:'課税8%',d:'軽減税率。飲食料品（酒類・外食を除く）と定期購読の新聞。'},
+ hi:{l:'非課税',d:'消費税の性格や社会政策上、課税しない取引。土地、住宅家賃、利息、保険料、商品券、行政手数料、社会保険診療など。売上なら課税売上割合の分母に入る。'},
+ fu:{l:'不課税',d:'そもそも消費税の課税対象でない取引（対価性がない・事業でない・国外取引）。給与、配当、寄附、補助金、損害賠償金、租税公課など。課税売上割合の計算にも入れない。'},
+ men:{l:'免税',d:'課税対象だが税率0%とする輸出取引等。輸出の証明が必要。課税売上割合では課税売上に含まれ、仕入税額控除も受けられる。'},
+ mx:{l:'内訳で異なる',d:'1回の支払の中に課税・非課税・不課税が混在するもの。請求書の内訳で分けて入力する。'}
+};
+// 帳簿のみの保存で仕入税額控除ができる取引（インボイスの交付義務免除等）
+var TOKUREI = [
+ ['公共交通機関の運賃','鉄道・バス・船舶で税込3万円未満（1回の取引単位）'],
+ ['自動販売機・自動サービス機','税込3万円未満。ATMの振込手数料、コインロッカー等'],
+ ['郵便ポスト投函の郵便料金','切手を貼ってポストに投函するもの'],
+ ['入場券等で回収されるもの','回収される乗車券・入場券など'],
+ ['従業員への出張旅費・日当・通勤手当','通常必要と認められる部分'],
+ ['古物商・質屋・宅建業者の仕入','適格請求書発行事業者でない人から、棚卸資産として購入する古物等'],
+ ['再生資源・再生部品の仕入','適格請求書発行事業者でない人からの購入'],
+ ['少額特例（税込1万円未満）','基準期間の課税売上高1億円以下又は特定期間の課税売上高5,000万円以下の事業者。令和11年9月30日までの課税仕入']
+];
+
+</script>
+<script>
+/* 勘定科目・消費税区分ナビ 計算ロジック */
+var KM = (function(){
+  const fl = Math.floor;
+  // 税込→税抜（円未満切捨て後の税額を引く）
+  function split(komi, rate){ const tax = fl(komi * rate / (100 + rate)); return {nuki: komi - tax, tax} }
+  // 飲食費の交際費判定（令和6年4月1日以後の支出）
+  function settai(o){
+    const total = o.total || 0, n = Math.max(1, o.n || 1);
+    const base = o.keiri === 'komi' ? total : split(total, o.rate || 10).nuki;
+    const per = base / n;
+    let kind;
+    if (!o.outside) kind = 'shanai';
+    else kind = per <= 10000 ? 'kaigi' : 'settai';
+    return {base, per: fl(per), kind};
+  }
+  // 免税事業者からの課税仕入の経過措置
+  const KEIKA = [['2023-10-01',0.8],['2026-10-01',0.7],['2028-10-01',0.5],['2030-10-01',0.3],['2031-10-01',0]];
+  function keikaRate(date){
+    if (!date || date < '2023-10-01') return 1;
+    let r = 1; for (const [d, v] of KEIKA) if (date >= d) r = v; return r;
+  }
+  function menzei(o){
+    const rate = o.rate || 10, ratio = keikaRate(o.date);
+    const full = fl((o.amount || 0) * rate / (100 + rate));
+    const ded = fl(full * ratio);
+    return {full, ratio, ded, cost: full - ded};
+  }
+  // 少額資産の判定（price=1単位の取得価額。税抜経理なら税抜、税込経理なら税込）
+  function shisan(o){
+    const p = o.price || 0, lim = (!o.date || o.date >= '2026-04-01') ? 400000 : 300000;
+    const opt = [];
+    if (p < 100000) opt.push({k:'shomo', l:'消耗品費として全額損金', d:'少額の減価償却資産（取得価額10万円未満）。償却資産税の申告も不要'});
+    if (p < 200000) opt.push({k:'ikkatsu', l:'一括償却資産として3年で均等償却', d:'取得価額20万円未満。月数按分なし（期中取得でも1/3）。償却資産税の申告は不要'});
+    if (o.chusho && p < lim) opt.push({k:'tokurei', l:'中小企業者等の少額減価償却資産の特例で全額損金', d:'取得価額'+(lim/10000)+'万円未満。年間合計300万円まで。償却資産税の申告の対象。法人は別表16(7)を添付'});
+    opt.push({k:'futsu', l:'通常の減価償却', d:'耐用年数にわたって償却する'});
+    return {lim, opt, best: opt[0].k};
+  }
+  return {split, settai, KEIKA, keikaRate, menzei, shisan};
+})();
+if (typeof module !== 'undefined') module.exports = KM;
+
+</script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const num=v=>{const n=parseInt(String(v||'').replace(/[^\d]/g,''),10);return isNaN(n)?0:n};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CALC={settai_over:'settai',settai_under:'settai',menzei_shiire:'menzei',shomohin:'shisan'};
+const INV={req:['req','適格請求書が必要'],no:['no','帳簿のみで控除可']};
+const LS='kamoku-navi-v1';
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let S={tab:'judge',c:'settai',q:'',v:'',open:'',in:{eTot:'33000',eN:'3',eKeiri:'nuki',eOut:true,mAmt:'110000',mDate:today(),mRt:'10',aPrice:'350000',aDate:today(),aChusho:true,xDir:'komi',xAmt:'11000',xRt:'10',xAmt8:''}};
+try{const s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&s.in){S=Object.assign(S,s,{in:Object.assign(S.in,s.in)})}}catch(e){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
+
+/* ---- 判定 ---- */
+const norm=s=>String(s).toLowerCase().replace(/[ァ-ン]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const HAY=new Map(TX.map(x=>[x.id,norm([x.t,x.a,x.g,x.k||'',(x.n||[]).join(' '),ZK[x.z].l].join(' '))]));
+const matchV=(x,v)=>!v||(v==='etc'?(x.z==='men'||x.z==='mx'):x.z===v);
+function invOf(x){if(x.s==='u')return['na','売上側'];if(INV[x.inv])return INV[x.inv];return['na','仕入税額控除なし']}
+function renderList(){
+  const words=norm(S.q.trim()).split(/\s+/).filter(Boolean);
+  const hit=TX.filter(x=>words.every(w=>HAY.get(x.id).includes(w)));
+  document.querySelectorAll('#flt button').forEach(b=>{const v=b.dataset.v;b.classList.toggle('on',v===S.v);b.querySelector('i').textContent=hit.filter(x=>matchV(x,v)).length});
+  const shown=hit.filter(x=>matchV(x,S.v));
+  if(!shown.length){$('list').innerHTML='<div class="empty">該当する取引がありません</div>';return}
+  const groups=[...new Set(shown.map(x=>x.g))];
+  $('list').innerHTML=groups.map(g=>'<div class="grp">'+esc(g)+'</div><div class="list">'+shown.filter(x=>x.g===g).map(x=>{
+    const o=S.open===x.id, iv=invOf(x);
+    return '<div class="it'+(o?' open':'')+'" data-id="'+x.id+'"><button type="button" aria-expanded="'+o+'"><span>'+esc(x.t)+'</span><span class="z '+x.z+'">'+ZK[x.z].l+'</span></button>'+
+      (o?'<div class="det"><dl class="kv"><dt>勘定科目</dt><dd class="acct">'+esc(x.a)+'</dd><dt>消費税</dt><dd><span class="z '+x.z+'">'+ZK[x.z].l+'</span><span class="side">'+(x.s==='u'?'売上':'仕入・経費')+'</span></dd>'+
+        '<dt>インボイス</dt><dd><span class="inv '+iv[0]+'">'+iv[1]+'</span></dd></dl>'+
+        (x.n&&x.n.length?'<ul>'+x.n.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>':'')+
+        (CALC[x.id]?'<button type="button" class="go" data-calc="'+CALC[x.id]+'">計算する</button>':'')+'</div>':'')+'</div>';
+  }).join('')+'</div>').join('');
+}
+$('q').value=S.q;
+$('q').addEventListener('input',e=>{S.q=e.target.value;renderList();save()});
+$('flt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.v=b.dataset.v;renderList();save()});
+$('list').addEventListener('click',e=>{
+  const g=e.target.closest('.go');if(g){S.c=g.dataset.calc;if(S.open==='settai_under'||S.open==='settai_over')S.in.eOut=true;showTab('calc');try{window.scrollTo(0,0)}catch(_){}return}
+  const b=e.target.closest('.it>button');if(!b)return;const id=b.parentNode.dataset.id;S.open=S.open===id?'':id;renderList();save();
+});
+
+/* ---- 計算 ---- */
+const NUMS=['eTot','eN','mAmt','aPrice','xAmt','xAmt8'], OTH=['mDate','mRt','aDate','xRt'];
+NUMS.forEach(id=>{const el=$(id);el.value=S.in[id]?fmt(num(S.in[id])):'';
+  el.addEventListener('input',()=>{S.in[id]=el.value;calc();save()});
+  el.addEventListener('focus',()=>{el.value=S.in[id]?String(num(S.in[id])):''});
+  el.addEventListener('blur',()=>{el.value=S.in[id]!==''&&S.in[id]!=null?fmt(num(S.in[id])):''});
+});
+OTH.forEach(id=>{const el=$(id);el.value=S.in[id];el.addEventListener('input',()=>{S.in[id]=el.value;calc();save()});el.addEventListener('change',()=>{S.in[id]=el.value;calc();save()})});
+[['eOut','eOut'],['aChusho','aChusho']].forEach(([id,k])=>{$(id).checked=!!S.in[k];$(id).addEventListener('change',e=>{S.in[k]=e.target.checked;calc();save()})});
+[['eKeiri','k','eKeiri'],['xDir','d','xDir']].forEach(([id,a,k])=>$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.in[k]=b.dataset[a];calc();save()}));
+$('seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.c=b.dataset.c;showCalc();save()});
+function showCalc(){document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.c===S.c));document.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==S.c);calc()}
+const yen=v=>fmt(v)+'<small>円</small>';
+function wareki(d){if(!d)return'';const [y,m]=d.split('-').map(Number);return '令和'+(y-2018)+'年'+m+'月'}
+function calc(){
+  const I=S.in;
+  // 交際費
+  document.querySelectorAll('#eKeiri button').forEach(b=>b.classList.toggle('on',b.dataset.k===I.eKeiri));
+  const e=KM.settai({total:num(I.eTot),n:num(I.eN),keiri:I.eKeiri,outside:I.eOut});
+  $('eBig').textContent={kaigi:'会議費等',settai:'交際費',shanai:'交際費（社内飲食）'}[e.kind];
+  $('eBig').classList.toggle('bad',e.kind!=='kaigi');
+  $('ePer').textContent=fmt(e.per);$('eBase').textContent=fmt(e.base)+(I.eKeiri==='nuki'?'（税抜）':'（税込）');
+  $('eNote').textContent=e.kind==='kaigi'?'1人当たり1万円以下なので交際費等から除外できます。飲食の年月日、参加者の氏名と関係、人数、金額、店名・所在地を記録した書類を保存してください。'
+    :e.kind==='settai'?'1人当たり1万円を超えるため交際費等。資本金1億円以下の法人は、年800万円の定額控除か接待飲食費の50%損金算入の有利な方を選べます。'
+    :'自社の役員・従業員だけの飲食は、1人1万円以下でも交際費等（全員を対象とした行事なら福利厚生費）。';
+  // 経過措置
+  const m=KM.menzei({amount:num(I.mAmt),date:I.mDate,rate:+I.mRt});
+  $('mDed').innerHTML=yen(m.ded);$('mRate').textContent=Math.round(m.ratio*100)+'%';$('mFull').textContent=fmt(m.full);$('mCost').textContent=fmt(m.cost);
+  const per=[['〜令和5年9月','2023-10-01',1,'区分記載請求書等'],['令和5年10月〜令和8年9月','2023-10-01',0.8,''],['令和8年10月〜令和10年9月','2026-10-01',0.7,''],['令和10年10月〜令和12年9月','2028-10-01',0.5,''],['令和12年10月〜令和13年9月','2030-10-01',0.3,''],['令和13年10月〜','2031-10-01',0,'']];
+  $('mTbl').innerHTML='<tr><th>課税仕入の時期</th><th>控除割合</th></tr>'+per.map(r=>'<tr'+(Math.abs(r[2]-m.ratio)<1e-9?' class="hit"':'')+'><td class="j">'+r[0]+'</td><td>'+Math.round(r[2]*100)+'%</td></tr>').join('');
+  // 少額資産
+  const a=KM.shisan({price:num(I.aPrice),date:I.aDate,chusho:I.aChusho});
+  $('aBig').innerHTML=yen(num(I.aPrice));$('aLim').textContent=(a.lim/10000)+'万円未満';
+  $('aOpt').innerHTML=a.opt.map(o=>'<div class="op'+(o.k===a.best?' best':'')+'"><b>'+o.l+'</b><span>'+o.d+'</span></div>').join('');
+  // 税込換算
+  document.querySelectorAll('#xDir button').forEach(b=>b.classList.toggle('on',b.dataset.d===I.xDir));
+  const amt=num(I.xAmt),rt=+I.xRt,a8=num(I.xAmt8);
+  let rows=[];
+  if(I.xDir==='komi'){const s=KM.split(amt,rt);$('xLab').textContent='税抜金額';$('xBig').innerHTML=yen(s.nuki);$('xTax').textContent=fmt(s.tax);$('xOther').innerHTML='税込 <b>'+fmt(amt)+'</b>';
+    rows.push([rt+'%対象',amt,s.nuki,s.tax]);
+    if(a8){const s8=KM.split(a8,8);rows.push(['8%対象',a8,s8.nuki,s8.tax]);rows.push(['合計',amt+a8,s.nuki+s8.nuki,s.tax+s8.tax])}
+  }else{const tax=Math.floor(amt*rt/100);$('xLab').textContent='税込金額';$('xBig').innerHTML=yen(amt+tax);$('xTax').textContent=fmt(tax);$('xOther').innerHTML='税抜 <b>'+fmt(amt)+'</b>';
+    rows.push([rt+'%対象',amt+tax,amt,tax])}
+  $('xTbl').innerHTML='<tr><th></th><th>税込</th><th>税抜</th><th>消費税</th></tr>'+rows.map((r,i)=>'<tr'+(r[0]==='合計'?' class="tot"':'')+'><td class="j">'+r[0]+'</td><td>'+fmt(r[1])+'</td><td>'+fmt(r[2])+'</td><td>'+fmt(r[3])+'</td></tr>').join('');
+}
+
+/* ---- 早見 ---- */
+$('zl').innerHTML=Object.keys(ZK).map(k=>'<div><span><span class="z '+k+'">'+ZK[k].l+'</span></span><span>'+esc(ZK[k].d)+'</span></div>').join('');
+$('tkTbl').innerHTML='<tr><th>取引</th><th>要件</th></tr>'+TOKUREI.map(r=>'<tr><td class="j">'+esc(r[0])+'</td><td class="j">'+esc(r[1])+'</td></tr>').join('');
+$('kkTbl').innerHTML='<tr><th>課税仕入の時期</th><th>控除割合</th></tr>'+[['令和5年10月〜令和8年9月','80%'],['令和8年10月〜令和10年9月','70%'],['令和10年10月〜令和12年9月','50%'],['令和12年10月〜令和13年9月','30%'],['令和13年10月〜','控除なし']].map(r=>'<tr><td class="j">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('');
+
+/* ---- タブ ---- */
+function showTab(t){S.tab=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  ['judge','calc','quick'].forEach(k=>$('v-'+k).hidden=k!==t);if(t==='calc')showCalc();save()}
+document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;showTab(b.dataset.tab);try{window.scrollTo(0,0)}catch(_){}});
+
+renderList();showTab(S.tab);
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
